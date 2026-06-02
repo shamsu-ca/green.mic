@@ -191,8 +191,9 @@ const TEXT_COLOR = "#4c9046";
 const HEIGHT_FROM_BOTTOM = 950;
 const DISTANCE_FROM_RIGHT = 1060;
 
-const OUTLINE_COLOR = "#000000";
-const OUTLINE_WIDTH = 15;
+// Border completely removed here
+const OUTLINE_COLOR = "transparent";
+const OUTLINE_WIDTH = 0;
 
 /* ================================================== */
 
@@ -216,7 +217,7 @@ let startY = 0;
 frameImage.src = "frame.png";
 frameImage.onload = () => { drawCanvas(); };
 
-// CRITICAL FIX: Forces the canvas to redraw as soon as Google Fonts are loaded over the network!
+// Forces the canvas to redraw as soon as Google Fonts are loaded over the network!
 if (document.fonts) {
     document.fonts.load(`600 ${FONT_SIZE}px "Anek Malayalam"`).then(() => {
         drawCanvas();
