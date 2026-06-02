@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Green MIC</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Anek+Malayalam:wght@600&display=swap" rel="stylesheet">
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #f4f7f5;
+    font-family: "Anek Malayalam", sans-serif;
+    color: #2c3e50;
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 450px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(11, 122, 62, 0.06);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+h1 {
+    color: #0b7a3e;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* Perfect responsive sizing for mobile screen viewports */
+.canvas-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 5 / 6; /* Preserves 3000x3600 ratio natively */
+    background: #eaeee3;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+    touch-action: none;
+    margin-bottom: 16px;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.controls-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.input-field:focus {
+    border-color: #0b7a3e;
+}
+
+.file-upload-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #f0f7f4;
+    color: #0b7a3e;
+    border: 1.5px dashed #0b7a3e;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+#upload {
+    display: none;
+}
+
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 2px 0;
+}
+
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.zoom-slider {
+    width: 100%;
+    accent-color: #0b7a3e;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.btn-download {
+    background: #0b7a3e;
+    color: #ffffff;
+    border: none;
+    width: 100%;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 4px;
+}
+
+.btn-download:hover, .btn-download:active {
+    background: #085c2f;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Green MIC</h1>
+    </header>
+
+    <div class="canvas-wrapper">
+        <canvas id="canvas" width="3000" height="3600"></canvas>
+    </div>
+
+    <div class="controls-group">
+        <label class="file-upload-label" for="upload">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Your Photo
+        </label>
+        <input type="file" id="upload" accept="image/*">
+
+        <div class="slider-container">
+            <div class="slider-label">
+                <span>Zoom Photo</span>
+                <span id="zoomVal">100%</span>
+            </div>
+            <input type="range" id="zoomSlider" class="zoom-slider" min="0.1" max="3" step="0.01" value="1" disabled>
+        </div>
+
+        <input type="text" id="nameInput" class="input-field" placeholder="Enter Your Name">
+
+        <button class="btn-download" onclick="downloadImage()">
+            Download Image
+        </button>
+    </div>
+</div>
+
+<script>
+/* ==================================================
+   TEXT SETTINGS
+================================================== */
+const FONT_SIZE = 160;
+const TEXT_COLOR = "#FFFFFF";
+const HEIGHT_FROM_BOTTOM = 400;
+const DISTANCE_FROM_RIGHT = 850;
+
+const OUTLINE_COLOR = "#000000";
+const OUTLINE_WIDTH = 15;
+
+/* ================================================== */
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const zoomSlider = document.getElementById("zoomSlider");
+const zoomVal = document.getElementById("zoomVal");
+
+let userImage = null;
+let frameImage = new Image();
+
+let scale = 1;
+let baseScale = 1; 
+let posX = 0;
+let posY = 0;
+
+let dragging = false;
+let startX = 0;
+let startY = 0;
+
+frameImage.src = "frame.png";
+frameImage.onload = () => { drawCanvas(); };
+
+// CRITICAL FIX: Forces the canvas to redraw as soon as Google Fonts are loaded over the network!
+if (document.fonts) {
+    document.fonts.load(`600 ${FONT_SIZE}px "Anek Malayalam"`).then(() => {
+        drawCanvas();
+    });
+}
+
+function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Draw uploaded image
+    if (userImage) {
+        const currentScale = baseScale * scale;
+        const imgWidth = userImage.width * currentScale;
+        const imgHeight = userImage.height * currentScale;
+        ctx.drawImage(userImage, posX, posY, imgWidth, imgHeight);
+    }
+
+    // 2. Draw Frame Layer
+    ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+
+    // 3. Draw Input Text
+    const name = document.getElementById("nameInput").value;
+    
+    const anchorX = canvas.width - DISTANCE_FROM_RIGHT;
+    const anchorY = canvas.height - HEIGHT_FROM_BOTTOM;
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    // Setting up the exact Anek Malayalam weight inside the canvas engine
+    ctx.font = `600 ${FONT_SIZE}px "Anek Malayalam", sans-serif`;
+
+    // Outline stroke
+    ctx.lineWidth = OUTLINE_WIDTH;
+    ctx.strokeStyle = OUTLINE_COLOR;
+    ctx.strokeText(name, anchorX, anchorY);
+
+    // Filled Text
+    ctx.fillStyle = TEXT_COLOR;
+    ctx.fillText(name, anchorX, anchorY);
+}
+
+/* ==================================================
+   MOBILE DRAG & SCALE LOGIC
+================================================== */
+function getCanvasCoordinates(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+}
+
+function startDrag(e) {
+    if (!userImage) return;
+    dragging = true;
+    const coords = getCanvasCoordinates(e);
+    startX = coords.x - posX;
+    startY = coords.y - posY;
+}
+
+function drag(e) {
+    if (!dragging || !userImage) return;
+    e.preventDefault();
+    const coords = getCanvasCoordinates(e);
+    posX = coords.x - startX;
+    posY = coords.y - startY;
+    drawCanvas();
+}
+
+function endDrag() {
+    dragging = false;
+}
+
+canvas.addEventListener("mousedown", startDrag);
+canvas.addEventListener("mousemove", drag);
+canvas.addEventListener("mouseup", endDrag);
+canvas.addEventListener("mouseleave", endDrag);
+
+canvas.addEventListener("touchstart", startDrag, { passive: false });
+canvas.addEventListener("touchmove", drag, { passive: false });
+canvas.addEventListener("touchend", endDrag);
+
+/* ==================================================
+   LISTENERS & CONTROLS
+================================================== */
+document.getElementById("upload").addEventListener("change", function(e) {
+    if (!e.target.files[0]) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            userImage = img;
+            
+            baseScale = Math.max(canvas.width / img.width, canvas.height / img.height);
+            scale = 1;
+            
+            zoomSlider.disabled = false;
+            zoomSlider.value = 1;
+            zoomVal.innerText = "100%";
+            
+            posX = (canvas.width - img.width * baseScale) / 2;
+            posY = (canvas.height - img.height * baseScale) / 2;
+
+            drawCanvas();
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(e.target.files[0]);
+});
+
+zoomSlider.addEventListener("input", function(e) {
+    if (!userImage) return;
+    
+    const oldScale = baseScale * scale;
+    scale = parseFloat(e.target.value);
+    const newScale = baseScale * scale;
+    zoomVal.innerText = Math.round(scale * 100) + "%";
+
+    posX = canvas.width / 2 - ((canvas.width / 2 - posX) * newScale) / oldScale;
+    posY = canvas.height / 2 - ((canvas.height / 2 - posY) * newScale) / oldScale;
+
+    drawCanvas();
+});
+
+document.getElementById("nameInput").addEventListener("input", drawCanvas);
+
+function downloadImage() {
+    const nameVal = document.getElementById("nameInput").value.trim();
+    const fileName = nameVal.replace(/[^a-z0-9]/gi, '_').toLowerCase() || "green_mic_campaign";
+
+    const link = document.createElement("a");
+    link.download = fileName + ".png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+}
+
+drawCanvas();
+</script>
+
+</body>
+</html>
